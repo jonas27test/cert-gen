@@ -3,19 +3,22 @@ package main
 import (
 	"flag"
 	"log"
-	"time"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	clientset "github.com/jetstack/cert-manager/pkg/client/clientset/versioned"
 )
 
 func main() {
 	var kubeconfig string
 	var namespace string
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to Kubernetes config file. Defaults to in-cluster config.")
-	flag.StringVar(&namespace, "namespace", "", "Namespace where to search for ")
+	flag.StringVar(&namespace, "namespace", "", "Namespace where to search for. Default is all namespaces.")
 	flag.Parse()
 	log.SetFlags(log.Lshortfile)
 
@@ -26,23 +29,29 @@ func main() {
 		log.Println(err)
 	}
 	factory := informers.NewSharedInformerFactory(k8sSet, 0)
-	watchSvc(factory, namespace)
-	time.Sleep(50 * time.Second)
+	// watchSvc(factory, namespace)
 
-	// certSet, err := clientset.NewForConfig(config)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	certSet, err := clientset.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+	certInterface := certSet.CertmanagerV1alpha3()
+	if err != nil {
+		log.Println(err)
+	}
 
-	// informer := v1.NewDeploymentInformer(k8sSet, namespace, 60*time.Second, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	// informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-	// 	AddFunc:    func(obj interface{}) { print(obj, "add") },
-	// 	UpdateFunc: func(obj interface{}, update interface{}) { print(obj, "update") },
-	// 	DeleteFunc: func(obj interface{}) { print(obj, "del") },
-	// })
-	// go EndpointServer()
-	// informer.Run(wait.NeverStop)
+	go EndpointServer()
 
+	informer := factory.Core().V1().Services().Informer()
+	stopper := make(chan struct{})
+	defer close(stopper)
+	defer runtime.HandleCrash()
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(obj interface{}) { listService(informer.GetIndexer().List(), certInterface) },
+		UpdateFunc: func(obj interface{}, update interface{}) { listService(informer.GetIndexer().List(), certInterface) },
+		// DeleteFunc: func(obj interface{}) { certList = Convert(informer.GetIndexer().List()) },
+	})
+	informer.Run(stopper)
 }
 
 func connect(kubeconfig string) *rest.Config {
@@ -61,6 +70,5 @@ func connect(kubeconfig string) *rest.Config {
 			log.Panic(err)
 		}
 	}
-
 	return config
 }

@@ -1,20 +1,36 @@
 package main
 
 import (
-	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/cache"
+	"log"
+	"strings"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	certmanagerv1alpha3 "github.com/jetstack/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1alpha3"
 )
 
-func watchSvc(factory informers.SharedInformerFactory, namespace string) {
-	informer := factory.Core().V1().Services().Informer()
-	stopper := make(chan struct{})
-	defer close(stopper)
-	defer runtime.HandleCrash()
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { informer.GetIndexer().List() },
-		UpdateFunc: func(obj interface{}, update interface{}) { certList = Convert(informer.GetIndexer().List()) },
-		DeleteFunc: func(obj interface{}) { certList = Convert(informer.GetIndexer().List()) },
-	})
-	go informer.Run(stopper)
+func listService(objList []interface{}, certInterface certmanagerv1alpha3.CertmanagerV1alpha3Interface) {
+	svcCounter := 0
+	for _, c := range objList {
+		svc := *c.(*v1.Service)
+		if len(svc.ObjectMeta.Annotations) > 0 {
+			if _, ok := svc.ObjectMeta.Annotations["cert-gen.name"]; ok {
+				tru := true
+				certMeta := CertGenMeta{OwnerRef: metav1.OwnerReference{
+					APIVersion:         "v1",
+					Kind:               "Service",
+					Name:               svc.Name,
+					UID:                svc.UID,
+					BlockOwnerDeletion: &tru,
+				}}
+				certMeta.Name = svc.ObjectMeta.Annotations["cert-gen.name"]
+				certMeta.Namespace = svc.ObjectMeta.Annotations["cert-gen.namespace"]
+				certMeta.DNSNames = strings.Split(svc.ObjectMeta.Annotations["cert-gen.dnsNames"], ",")
+				log.Println(certMeta.GenCert(certInterface))
+			}
+		}
+		svcCounter++
+	}
+	svcWatch.Set(float64(svcCounter))
 }

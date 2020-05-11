@@ -8,10 +8,10 @@ import (
 )
 
 var (
-	metricsCertsReady = prometheus.NewGauge(
+	svcWatch = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "certs_ready",
-			Help: "The current number of fulfilled certificates and thus secrets created via cert-manager (if with owner ref).",
+			Name: "svc_watch",
+			Help: "The current number of services with cert annotations",
 		})
 
 	metricsCertsInProgress = prometheus.NewGauge(
@@ -23,9 +23,9 @@ var (
 
 func registerMetrics() {
 	r := prometheus.NewRegistry()
-	r.MustRegister(metricsCertsReady)
-	r.MustRegister(metricsCertsInProgress)
+	r.MustRegister(svcWatch)
+	// r.MustRegister(metricsCertsInProgress)
 
-	http.Handle("/metrics", promhttp.Handler())
+	// http.Handle("/metrics/", promhttp.Handler())
 	http.Handle("/metrics/", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
 }
