@@ -50,14 +50,14 @@ func (m *CertGenMeta) GenCert(certInterface certmanagerv1alpha3.CertmanagerV1alp
 			Usages:       []v1alpha3.KeyUsage{v1alpha3.UsageAny},
 			DNSNames:     m.DNSNames,
 			IssuerRef: cmmeta.ObjectReference{
-				Name:  "letsencrypt-staging",
-				Kind:  "ClusterIssuer",
+				Name:  m.IssuerRef.Name,
+				Kind:  m.IssuerRef.Kind,
 				Group: "cert-manager.io",
 			},
 		},
 	}
-	certInterface.Certificates("test").Create(context.TODO(), cert, metav1.CreateOptions{})
-	return nil
+	_, err := certInterface.Certificates(m.Namespace).Create(context.TODO(), cert, metav1.CreateOptions{})
+	return err
 
 }
 

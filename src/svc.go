@@ -7,6 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	cmmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	certmanagerv1alpha3 "github.com/jetstack/cert-manager/pkg/client/clientset/versioned/typed/certmanager/v1alpha3"
 )
 
@@ -27,6 +28,10 @@ func listService(objList []interface{}, certInterface certmanagerv1alpha3.Certma
 				certMeta.Name = svc.ObjectMeta.Annotations["cert-gen.name"]
 				certMeta.Namespace = svc.ObjectMeta.Annotations["cert-gen.namespace"]
 				certMeta.DNSNames = strings.Split(svc.ObjectMeta.Annotations["cert-gen.dnsNames"], ",")
+				certMeta.IssuerRef = cmmeta.ObjectReference{
+					Name: svc.ObjectMeta.Annotations["cert-gen.issuer.name"],
+					Kind: svc.ObjectMeta.Annotations["cert-gen.issuer.kind"],
+				}
 				log.Println(certMeta.GenCert(certInterface))
 			}
 		}

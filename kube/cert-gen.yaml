@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cert-gen
+  namespace: certs
+spec:
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+  selector:
+    app: cert-gen
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cert-gen
+  namespace: certs
+spec: 
+  selector:
+    matchLabels:
+      app: cert-gen
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cert-gen
+    spec:
+      serviceAccountName: cert-gen-serviceaccount
+      containers:
+      - name: cert-gen
+        image: jonas27test/cert-gen:latest
+        # args: ["-serverCrt", "tls.crt","-serverKey", "tls.key"]
+        ports:
+        - name: http
+          containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            httpHeaders:
+            - name: Custom-Header
+              value: OK
+          initialDelaySeconds: 3
+          periodSeconds: 30
+      restartPolicy: Always
